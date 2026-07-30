@@ -71,6 +71,7 @@ export default function App() {
           onDuplicate={() => duplicateDeal(openDeal.id)}
           onDelete={() => deleteDeal(openDeal.id)}
           defaults={defaults}
+          onDefaultsChange={setDefaults}
         />
       ) : (
         <DealsList

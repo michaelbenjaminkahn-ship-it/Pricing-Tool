@@ -3,7 +3,49 @@ import type { GlobalDefaults } from '../engine/types';
 import { GLOBAL_DEFAULTS } from '../data/appDefaults';
 import { Button, Field, Modal, NumInput, SelectInput, TextInput } from './ui';
 
-type Tab = 'rates' | 'handling' | 'ports';
+type Tab = 'rates' | 'handling' | 'ports' | 'lists';
+
+/** Editable chip list for the simple string pick-lists. */
+function ChipList({
+  items,
+  onChange,
+  addLabel,
+}: {
+  items: string[];
+  onChange: (items: string[]) => void;
+  addLabel: string;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map(item => (
+        <span
+          key={item}
+          className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 pl-2.5 pr-1 py-0.5 text-xs text-slate-700"
+        >
+          {item}
+          <button
+            type="button"
+            onClick={() => onChange(items.filter(i => i !== item))}
+            className="text-slate-300 hover:text-rose-500 leading-none text-sm px-0.5"
+            title={`Remove ${item}`}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      <button
+        type="button"
+        onClick={() => {
+          const name = prompt(addLabel)?.trim();
+          if (name && !items.includes(name)) onChange([...items, name]);
+        }}
+        className="rounded-full border border-dashed border-slate-300 px-2.5 py-0.5 text-xs text-blue-600 hover:border-blue-400"
+      >
+        ＋ Add
+      </button>
+    </div>
+  );
+}
 
 /**
  * Global defaults editor. Defaults seed NEW deals; existing deals keep their
@@ -31,6 +73,7 @@ export function SettingsModal({
     { key: 'rates', label: 'Rates & finance' },
     { key: 'handling', label: 'Handling' },
     { key: 'ports', label: 'Port reference' },
+    { key: 'lists', label: 'Lists' },
   ];
 
   return (
@@ -236,6 +279,144 @@ export function SettingsModal({
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {tab === 'lists' && (
+          <div className="space-y-5">
+            <p className="text-xs text-slate-500">
+              These fill the dropdowns on a deal. You can also add an entry inline from the deal screen.
+            </p>
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Suppliers</h3>
+              <ChipList
+                items={defaults.suppliers}
+                onChange={suppliers => onChange({ ...defaults, suppliers })}
+                addLabel="New supplier"
+              />
+            </div>
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Customers</h3>
+              <ChipList
+                items={defaults.customers}
+                onChange={customers => onChange({ ...defaults, customers })}
+                addLabel="New customer"
+              />
+            </div>
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Grades</h3>
+              <ChipList
+                items={defaults.grades}
+                onChange={grades => onChange({ ...defaults, grades })}
+                addLabel="New grade"
+              />
+            </div>
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                Origin ports — weight gain column
+              </h3>
+              <p className="text-xs text-slate-500 mb-2">
+                Japanese and Korean mills roll closer to theoretical weight, so they use a different gain column.
+                Picking an origin on a deal applies the right one automatically.
+              </p>
+              <div className="space-y-1.5 max-w-sm">
+                {defaults.originPorts.map(port => (
+                  <div key={port.name} className="flex items-center gap-2">
+                    <span className="text-sm text-slate-700 w-32">{port.name}</span>
+                    <SelectInput
+                      value={port.gainBasis}
+                      onChange={v =>
+                        onChange({
+                          ...defaults,
+                          originPorts: defaults.originPorts.map(p =>
+                            p.name === port.name ? { ...p, gainBasis: v as typeof p.gainBasis } : p,
+                          ),
+                        })
+                      }
+                      options={[
+                        { value: 'TW', label: 'Taiwan column' },
+                        { value: 'JPKR', label: 'Japan / Korea column' },
+                      ]}
+                      className="flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChange({
+                          ...defaults,
+                          originPorts: defaults.originPorts.filter(p => p.name !== port.name),
+                        })
+                      }
+                      className="text-slate-300 hover:text-rose-500 px-1"
+                      title={`Remove ${port.name}`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const name = prompt('New origin port')?.trim();
+                    if (name && !defaults.originPorts.some(p => p.name === name)) {
+                      onChange({ ...defaults, originPorts: [...defaults.originPorts, { name, gainBasis: 'TW' }] });
+                    }
+                  }}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  ＋ Add origin port
+                </button>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Commission agents</h3>
+              <div className="space-y-1.5 max-w-sm">
+                {defaults.commissionAgents.map(agent => (
+                  <div key={agent.name} className="flex items-center gap-2">
+                    <span className="text-sm text-slate-700 w-32">{agent.name}</span>
+                    <div className="w-24">
+                      <NumInput
+                        value={agent.pct}
+                        onChange={v =>
+                          onChange({
+                            ...defaults,
+                            commissionAgents: defaults.commissionAgents.map(a =>
+                              a.name === agent.name ? { ...a, pct: v } : a,
+                            ),
+                          })
+                        }
+                        suffix="%"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChange({
+                          ...defaults,
+                          commissionAgents: defaults.commissionAgents.filter(a => a.name !== agent.name),
+                        })
+                      }
+                      className="text-slate-300 hover:text-rose-500 px-1"
+                      title={`Remove ${agent.name}`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const name = prompt('New commission agent')?.trim();
+                    if (name && !defaults.commissionAgents.some(a => a.name === name)) {
+                      onChange({ ...defaults, commissionAgents: [...defaults.commissionAgents, { name, pct: 1 }] });
+                    }
+                  }}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  ＋ Add agent
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

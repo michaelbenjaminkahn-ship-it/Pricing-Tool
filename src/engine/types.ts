@@ -77,6 +77,8 @@ export interface Deal {
   name: string;
   supplier: string;
   customer: string;
+  /** e.g. '304/L' — descriptive only, does not affect the math */
+  grade?: string;
   originPort: string;
   destinationPort: string;
   incoterm: Incoterm;
@@ -145,6 +147,15 @@ export interface WeightGainRow {
   gainPctJP: number;
 }
 
+/** Which weight-gain column a mill's output is priced against. */
+export type GainBasis = 'TW' | 'JPKR';
+
+export interface OriginPort {
+  name: string;
+  /** Mills in Japan/Korea roll closer to theoretical weight than Taiwan. */
+  gainBasis: GainBasis;
+}
+
 /** Global defaults applied to new deals (deals snapshot their own copies). */
 export interface GlobalDefaults {
   rates: DealRates;
@@ -154,4 +165,10 @@ export interface GlobalDefaults {
   drayageByPort: Record<string, number>;
   storageByPort: Record<string, number>;
   destinationPorts: string[];
+  // Pick-lists — keep free text out of the day-to-day screens.
+  suppliers: string[];
+  customers: string[];
+  originPorts: OriginPort[];
+  grades: string[];
+  commissionAgents: { name: string; pct: number }[];
 }

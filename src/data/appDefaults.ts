@@ -1,4 +1,4 @@
-import type { Deal, DealProduct, GlobalDefaults, WeightGainRow } from '../engine/types';
+import type { Deal, DealProduct, GainBasis, GlobalDefaults, WeightGainRow } from '../engine/types';
 
 // ---------------------------------------------------------------------------
 // Weight gains by thickness — 304/L and 316/L plate.
@@ -30,6 +30,20 @@ export const WEIGHT_GAIN_TABLE: WeightGainRow[] = [
   { thickness: '3 3/4"', sellWeight: 157, buyWeightTW: 154.7, gainPctTW: 1.48, buyWeightJP: 157.44, gainPctJP: -0.28 },
   { thickness: '4"', sellWeight: 167, buyWeightTW: 165.02, gainPctTW: 1.2, buyWeightJP: 167.93, gainPctJP: -0.56 },
 ];
+
+export const THICKNESS_OPTIONS = WEIGHT_GAIN_TABLE.map(r => r.thickness);
+
+/** Weight gain % for a thickness, using the mill origin's column. */
+export function gainForThickness(thickness: string, basis: GainBasis): number | null {
+  const row = WEIGHT_GAIN_TABLE.find(r => r.thickness === thickness);
+  if (!row) return null;
+  return basis === 'JPKR' ? row.gainPctJP : row.gainPctTW;
+}
+
+/** Which gain column applies to a deal's origin port (Taiwan unless known otherwise). */
+export function gainBasisForPort(port: string, defaults: GlobalDefaults): GainBasis {
+  return defaults.originPorts.find(p => p.name === port)?.gainBasis ?? 'TW';
+}
 
 // ---------------------------------------------------------------------------
 // Global defaults — seed values for new deals. Deals snapshot their own copy,
@@ -66,6 +80,21 @@ export const GLOBAL_DEFAULTS: GlobalDefaults = {
     Oakland: 5.5, Chicago: 10, Miami: 7, 'New York': 8,
   },
   destinationPorts: ['Los Angeles', 'Houston', 'Baltimore', 'Seattle', 'Oakland', 'Chicago', 'Miami', 'New York', 'Camden'],
+  suppliers: ['PVST', 'Stanch', 'Yeou Yih', 'Yuen Chang', 'Wuu Jing'],
+  customers: ['Alro', 'Basic Metals', 'Oneal', 'Samuel'],
+  originPorts: [
+    { name: 'Kaohsiung', gainBasis: 'TW' },
+    { name: 'Taipei', gainBasis: 'TW' },
+    { name: 'Tokyo', gainBasis: 'JPKR' },
+    { name: 'Busan', gainBasis: 'JPKR' },
+    { name: 'Mumbai', gainBasis: 'TW' },
+  ],
+  grades: ['304/L', '316/L', '304/L & 316/L'],
+  commissionAgents: [
+    { name: 'Chiu', pct: 1 },
+    { name: 'Tradehansa', pct: 0.5 },
+    { name: 'None', pct: 0 },
+  ],
 };
 
 // ---------------------------------------------------------------------------
@@ -96,6 +125,7 @@ export function newDeal(defaults: GlobalDefaults, partial: Partial<Deal> = {}): 
     name: 'New deal',
     supplier: '',
     customer: '',
+    grade: '304/L',
     originPort: 'Kaohsiung',
     destinationPort: 'Los Angeles',
     incoterm: 'FOB',
@@ -140,6 +170,7 @@ export function seedDeals(): Deal[] {
     name: 'Yuen Chang → Alro',
     supplier: 'Yuen Chang',
     customer: 'Alro',
+    grade: '304/L',
     originPort: 'Kaohsiung',
     destinationPort: 'Los Angeles',
     incoterm: 'CIF',
@@ -169,6 +200,7 @@ export function seedDeals(): Deal[] {
     name: 'Yuen Chang → Samuel',
     supplier: 'Yuen Chang',
     customer: 'Samuel',
+    grade: '304/L',
     originPort: 'Kaohsiung',
     destinationPort: 'Los Angeles',
     incoterm: 'CIF',
@@ -198,6 +230,7 @@ export function seedDeals(): Deal[] {
     name: 'Yeou Yih → Alro (Camden bulk)',
     supplier: 'Yeou Yih',
     customer: 'Alro',
+    grade: '304/L',
     originPort: 'Kaohsiung',
     destinationPort: 'Camden',
     incoterm: 'FOB',
