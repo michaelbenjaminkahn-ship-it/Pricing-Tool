@@ -48,6 +48,15 @@ describe('normalizeDefaults', () => {
     expect(d.drayageByPort['Los Angeles']).toBe(GLOBAL_DEFAULTS.drayageByPort['Los Angeles']);
   });
 
+  it('flattens origin ports saved as objects', () => {
+    // They once carried a weight-gain column; plate now uses one column for
+    // every origin, so stored objects must come back as plain names.
+    const d = normalizeDefaults({
+      originPorts: [{ name: 'Kaohsiung', gainBasis: 'TW' }, { name: 'Busan', gainBasis: 'JPKR' }, 'Tokyo'],
+    });
+    expect(d.originPorts).toEqual(['Kaohsiung', 'Busan', 'Tokyo']);
+  });
+
   it('survives junk', () => {
     for (const junk of [null, undefined, 'nope', 42, []]) {
       const d = normalizeDefaults(junk);
@@ -110,9 +119,20 @@ describe('size lists', () => {
   it('has no invented gain figures for gauges', () => {
     // Sheet gain is unknown, so a gauge must never resolve to a number.
     for (const gauge of GAUGE_OPTIONS) {
-      expect(gainForThickness(gauge, 'TW')).toBeNull();
-      expect(gainForThickness(gauge, 'JPKR')).toBeNull();
+      expect(gainForThickness(gauge)).toBeNull();
     }
+  });
+
+  it('applies the % Gain TW column from the pricing sheet', () => {
+    // Spot-checked against "Plate Weight Gains by Thickness".
+    const expected: Record<string, number> = {
+      '3/16"': 10.91, '1/4"': 8.21, '1/2"': 5.01, '1"': 3.43,
+      '1 3/8"': 2.55, '2"': 1.82, '3"': 2.05, '4"': 1.2,
+    };
+    for (const [thickness, gain] of Object.entries(expected)) {
+      expect(gainForThickness(thickness)).toBe(gain);
+    }
+    expect(gainForThickness('nonsense')).toBeNull();
   });
 
   it('defaults a deal saved before the plate/sheet split to plate', () => {

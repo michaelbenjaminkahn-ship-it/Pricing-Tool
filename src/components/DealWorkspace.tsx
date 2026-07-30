@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { Deal, DealProduct, GlobalDefaults, ProductResult } from '../engine/types';
 import { calculateDeal, fmtLb, fmtMoney, fmtPct, MT_TO_LB } from '../engine/calc';
-import { gainBasisForPort, gainForThickness, newProduct, sizeOptionsFor } from '../data/appDefaults';
+import { gainForThickness, newProduct, sizeOptionsFor } from '../data/appDefaults';
 import { encodeDealToHash } from '../data/share';
 import { Button, Card, CardHeader, ComboSelect, Field, GpPill, Menu, NumInput, Segmented } from './ui';
 import { AssumptionsDrawer } from './AssumptionsDrawer';
@@ -42,8 +42,6 @@ export function DealWorkspace({
   const patchProduct = (id: string, p: Partial<DealProduct>) =>
     patch({ products: deal.products.map(x => (x.id === id ? { ...x, ...p } : x)) });
 
-  const gainBasis = gainBasisForPort(deal.originPort, defaults);
-
   /**
    * Picking a plate thickness fills in its weight gain from the table. Sheet
    * gauges have no gain data, so a previously auto-filled figure is cleared
@@ -52,7 +50,7 @@ export function DealWorkspace({
    */
   const setSize = (id: string, size: string) => {
     const product = deal.products.find(p => p.id === id);
-    const gain = deal.productForm === 'sheet' ? null : gainForThickness(size, gainBasis);
+    const gain = deal.productForm === 'sheet' ? null : gainForThickness(size);
     if (gain != null) {
       patchProduct(id, { description: size, weightGainPct: gain, weightGainAuto: true });
     } else if (product?.weightGainAuto) {
@@ -62,21 +60,16 @@ export function DealWorkspace({
     }
   };
 
-  /** Auto-filled gains follow the size/origin; typed ones are left alone. */
-  const rederiveGains = (products: DealProduct[], form: Deal['productForm'], basis: typeof gainBasis) =>
-    products.map(p => {
-      if (!p.weightGainAuto) return p;
-      const gain = form === 'sheet' ? null : gainForThickness(p.description, basis);
-      return gain != null ? { ...p, weightGainPct: gain } : { ...p, weightGainPct: 0, weightGainAuto: false };
-    });
-
-  const setOriginPort = (port: string) => {
-    const basis = gainBasisForPort(port, defaults);
-    patch({ originPort: port, products: rederiveGains(deal.products, deal.productForm, basis) });
-  };
-
+  /** Auto-filled gains follow the size; typed ones are left alone. */
   const setProductForm = (form: Deal['productForm']) => {
-    patch({ productForm: form, products: rederiveGains(deal.products, form, gainBasis) });
+    patch({
+      productForm: form,
+      products: deal.products.map(p => {
+        if (!p.weightGainAuto) return p;
+        const gain = form === 'sheet' ? null : gainForThickness(p.description);
+        return gain != null ? { ...p, weightGainPct: gain } : { ...p, weightGainPct: 0, weightGainAuto: false };
+      }),
+    });
   };
 
   const setDestinationPort = (port: string) => {
@@ -179,11 +172,9 @@ export function DealWorkspace({
             <Field label="Origin">
               <ComboSelect
                 value={deal.originPort}
-                onChange={setOriginPort}
-                options={defaults.originPorts.map(p => p.name)}
-                onAdd={name =>
-                  onDefaultsChange({ ...defaults, originPorts: [...defaults.originPorts, { name, gainBasis: 'TW' }] })
-                }
+                onChange={v => patch({ originPort: v })}
+                options={defaults.originPorts}
+                onAdd={name => onDefaultsChange({ ...defaults, originPorts: [...defaults.originPorts, name] })}
                 addLabel="New origin port"
               />
             </Field>
@@ -445,9 +436,7 @@ export function DealWorkspace({
           onClose={() => setShowAssumptions(false)}
         />
       )}
-      {showGainTable && (
-        <WeightGainPicker basis={gainBasis} form={deal.productForm} onClose={() => setShowGainTable(false)} />
-      )}
+      {showGainTable && <WeightGainPicker form={deal.productForm} onClose={() => setShowGainTable(false)} />}
 
       {toast && (
         <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg no-print">
