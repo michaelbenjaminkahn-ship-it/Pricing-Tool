@@ -1,26 +1,40 @@
 import { useEffect, useState } from 'react';
 import type { Deal, GlobalDefaults } from './engine/types';
-import { GLOBAL_DEFAULTS, makeId, newDeal, seedDeals } from './data/appDefaults';
+import {
+  GLOBAL_DEFAULTS,
+  makeId,
+  newDeal,
+  normalizeDeal,
+  normalizeDeals,
+  normalizeDefaults,
+  seedDeals,
+} from './data/appDefaults';
 import { decodeDealFromHash } from './data/share';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { DealsList } from './components/DealsList';
 import { DealWorkspace } from './components/DealWorkspace';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsModal } from './components/SettingsModal';
 
-export default function App() {
-  const [deals, setDeals] = useLocalStorage<Deal[]>('spt2-deals', seedDeals);
-  const [defaults, setDefaults] = useLocalStorage<GlobalDefaults>('spt2-defaults', GLOBAL_DEFAULTS);
+function AppContent() {
+  // Stored data may predate this version, so it is merged over current
+  // defaults on load — see normalizeDeals / normalizeDefaults.
+  const [deals, setDeals] = useLocalStorage<Deal[]>('spt2-deals', seedDeals, normalizeDeals);
+  const [defaults, setDefaults] = useLocalStorage<GlobalDefaults>(
+    'spt2-defaults',
+    GLOBAL_DEFAULTS,
+    normalizeDefaults,
+  );
   const [openDealId, setOpenDealId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
 
   // Import a deal shared via URL hash (#d=...)
   useEffect(() => {
-    const shared = decodeDealFromHash(location.hash);
+    const shared = normalizeDeal(decodeDealFromHash(location.hash));
     if (shared) {
       const imported: Deal = {
         ...shared,
         id: makeId('deal'),
-        name: shared.name,
         updatedAt: new Date().toISOString(),
       };
       setDeals(prev => [...prev, imported]);
@@ -88,5 +102,13 @@ export default function App() {
         <SettingsModal defaults={defaults} onChange={setDefaults} onClose={() => setShowSettings(false)} />
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
   );
 }

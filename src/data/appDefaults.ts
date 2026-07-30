@@ -98,6 +98,83 @@ export const GLOBAL_DEFAULTS: GlobalDefaults = {
 };
 
 // ---------------------------------------------------------------------------
+// Migration — saved data is written by whichever version was live at the time,
+// so anything loaded from localStorage may be missing keys this version reads.
+// Everything is merged over the current defaults before it reaches the UI; a
+// missing key must never be able to blank the screen.
+// ---------------------------------------------------------------------------
+
+const isObj = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** Keep only the numeric entries of a stored port-rate map. */
+const numMap = (v: unknown): Record<string, number> =>
+  isObj(v)
+    ? Object.fromEntries(Object.entries(v).filter(([, n]) => typeof n === 'number')) as Record<string, number>
+    : {};
+
+export function normalizeDefaults(stored: unknown): GlobalDefaults {
+  const d = isObj(stored) ? stored : {};
+  const base = GLOBAL_DEFAULTS;
+  const arr = <T>(v: unknown, fallback: T[]): T[] => (Array.isArray(v) ? (v as T[]) : fallback);
+  const leg = (v: unknown, fallback: GlobalDefaults['finance']['lcPreCash']) => ({
+    ...fallback,
+    ...(isObj(v) ? v : {}),
+  });
+  const finance = isObj(d.finance) ? d.finance : {};
+
+  return {
+    rates: { ...base.rates, ...(isObj(d.rates) ? d.rates : {}) },
+    finance: {
+      basis: (finance.basis as GlobalDefaults['finance']['basis']) ?? base.finance.basis,
+      lcPreCash: leg(finance.lcPreCash, base.finance.lcPreCash),
+      lcSailing: leg(finance.lcSailing, base.finance.lcSailing),
+      tariff: { ...base.finance.tariff, ...(isObj(finance.tariff) ? finance.tariff : {}) },
+    },
+    handling: { ...base.handling, ...(isObj(d.handling) ? d.handling : {}) },
+    markupPct: typeof d.markupPct === 'number' ? d.markupPct : base.markupPct,
+    drayageByPort: { ...base.drayageByPort, ...numMap(d.drayageByPort) },
+    storageByPort: { ...base.storageByPort, ...numMap(d.storageByPort) },
+    destinationPorts: arr(d.destinationPorts, base.destinationPorts),
+    suppliers: arr(d.suppliers, base.suppliers),
+    customers: arr(d.customers, base.customers),
+    originPorts: arr(d.originPorts, base.originPorts),
+    grades: arr(d.grades, base.grades),
+    commissionAgents: arr(d.commissionAgents, base.commissionAgents),
+  };
+}
+
+export function normalizeDeal(stored: unknown): Deal | null {
+  if (!isObj(stored) || typeof stored.id !== 'string') return null;
+  const base = newDeal(GLOBAL_DEFAULTS);
+  const d = stored;
+  const finance = isObj(d.finance) ? d.finance : {};
+  const products = Array.isArray(d.products) ? d.products : [];
+
+  return {
+    ...base,
+    ...(d as Partial<Deal>),
+    rates: { ...base.rates, ...(isObj(d.rates) ? d.rates : {}) },
+    finance: {
+      basis: (finance.basis as Deal['finance']['basis']) ?? base.finance.basis,
+      lcPreCash: { ...base.finance.lcPreCash, ...(isObj(finance.lcPreCash) ? finance.lcPreCash : {}) },
+      lcSailing: { ...base.finance.lcSailing, ...(isObj(finance.lcSailing) ? finance.lcSailing : {}) },
+      tariff: { ...base.finance.tariff, ...(isObj(finance.tariff) ? finance.tariff : {}) },
+    },
+    handling: { ...base.handling, ...(isObj(d.handling) ? d.handling : {}) },
+    products: (products.length ? products : [newProduct()]).map(p => ({
+      ...newProduct(),
+      ...(isObj(p) ? p : {}),
+    })),
+  };
+}
+
+export function normalizeDeals(stored: unknown): Deal[] {
+  if (!Array.isArray(stored)) return seedDeals();
+  return stored.map(normalizeDeal).filter((d): d is Deal => d !== null);
+}
+
+// ---------------------------------------------------------------------------
 // Factories
 // ---------------------------------------------------------------------------
 let seq = 0;
