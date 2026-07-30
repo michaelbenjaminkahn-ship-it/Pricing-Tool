@@ -1,73 +1,56 @@
-# React + TypeScript + Vite
+# Steel Pricing
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Landed-cost and quote workspace for imported stainless steel plate.
 
-Currently, two official plugins are available:
+Live app: https://michaelbenjaminkahn-ship-it.github.io/Pricing-Tool/
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## How it works
 
-## React Compiler
+- **Deals are the unit of work.** A deal is one supplier→customer lane with shared
+  freight, duties, finance, and handling — and one or more sizes priced side by side
+  (mirroring the original Excel deal sheets). Open a deal, change the FOB price or
+  freight, everything recalculates instantly.
+- **Every number is auditable.** The cost breakdown shows the formula for each line
+  (e.g. `50% × $2,260 FOB`), so any figure can be checked at a glance.
+- **Share links.** "Share link" encodes the whole deal into a URL — a colleague who
+  opens it gets the exact deal in their own workspace. No backend, no accounts.
+- **Global defaults** (Rates & defaults) seed new deals. Existing deals keep their
+  own snapshot until you explicitly apply defaults inside the deal, so saved quotes
+  never shift silently.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Accuracy
 
-## Expanding the ESLint configuration
+The calculation engine (`src/engine/calc.ts`) was reconciled cell-by-cell against the
+real pricing workbooks, and `src/engine/calc.test.ts` locks it to their exact outputs:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+| Workbook | Deal | Verified values |
+|---|---|---|
+| alro.xlsx | Yuen Chang → Alro (CIF LA) | landed $3,488.23/MT · $1.5822/lb · sale $1.646 |
+| sammyla50pct.xlsx | Yuen Chang → Samuel (CIF LA) | landed $3,172.02/MT · $1.4388/lb · sale $1.583 |
+| alro__camden_bulk.xlsx | Yeou Yih → Alro (bulk, 3 sizes) | landed $3,558.93 / $3,682.31 / $3,855.64/MT · total margin $10,609.69 |
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Conventions proven by those workbooks (and enforced by the tests):
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- Section 232 / HMF / MPF are computed on the **contract FOB** (customs basis),
+  not the weight-gain-adjusted FOB. Weight gain adjusts the material cost line only.
+- Marine insurance applies to FOB deals only (a CIF price already includes it).
+- Credit insurance is computed on the CFR value (contract + freight).
+- LC finance and commission are computed on the **contract price** (CIF for CIF
+  deals, FOB for FOB deals). A per-deal toggle supports the CFR basis instead.
+- Tariff finance = tariff amount × %financed × rate × days/360 (default 100% financed).
+- Sale from markup = landed × (1 + markup%), rounded to 0.001; GP% is reported on sale.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+CI runs the test suite before every deploy — a change that breaks agreement with the
+workbooks cannot ship.
+
+## Development
+
+```bash
+npm install
+npm run dev      # local dev server
+npm test         # calculation tests (locked to the source workbooks)
+npm run build    # type-check + production build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Deployed to GitHub Pages automatically on push to `main`
+(`.github/workflows/deploy.yml`).
