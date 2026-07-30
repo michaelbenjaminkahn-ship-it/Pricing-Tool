@@ -1,34 +1,36 @@
-import type { Deal, DealProduct, GainBasis, GlobalDefaults, WeightGainRow } from '../engine/types';
+import type { Deal, DealProduct, GlobalDefaults, WeightGainRow } from '../engine/types';
 
 // ---------------------------------------------------------------------------
-// Weight gains by thickness — 304/L and 316/L plate.
-// "% gain" = theoretical (sell) vs mill (buy) weight; differs by mill origin.
-// Values from the current pricing sheet (TW and JP/KR columns).
+// Plate weight gains by thickness — 304/L and 316/L.
+//
+// Transcribed from the "Plate Weight Gains by Thickness" sheet. `gainPct` is
+// that sheet's "% Gain TW" column, applied to every origin. Buy weights are
+// kept for reference in the lookup panel; nothing calculates from them.
 // ---------------------------------------------------------------------------
 export const WEIGHT_GAIN_TABLE: WeightGainRow[] = [
-  { thickness: '3/16"', sellWeight: 8.579, buyWeightTW: 7.74, gainPctTW: 10.91, buyWeightJP: 7.87, gainPctJP: 8.24 },
-  { thickness: '1/4"', sellWeight: 11.16, buyWeightTW: 10.31, gainPctTW: 8.21, buyWeightJP: 10.5, gainPctJP: 5.95 },
-  { thickness: '5/16"', sellWeight: 13.75, buyWeightTW: 12.89, gainPctTW: 6.66, buyWeightJP: 13.12, gainPctJP: 4.58 },
-  { thickness: '3/8"', sellWeight: 16.5, buyWeightTW: 15.47, gainPctTW: 6.66, buyWeightJP: 15.74, gainPctJP: 4.58 },
-  { thickness: '1/2"', sellWeight: 21.66, buyWeightTW: 20.63, gainPctTW: 5.01, buyWeightJP: 20.99, gainPctJP: 3.09 },
-  { thickness: '5/8"', sellWeight: 26.83, buyWeightTW: 25.78, gainPctTW: 4.06, buyWeightJP: 26.24, gainPctJP: 2.2 },
-  { thickness: '3/4"', sellWeight: 32.12, buyWeightTW: 30.94, gainPctTW: 3.81, buyWeightJP: 31.49, gainPctJP: 1.97 },
-  { thickness: '7/8"', sellWeight: 37.29, buyWeightTW: 36.1, gainPctTW: 3.3, buyWeightJP: 36.73, gainPctJP: 1.49 },
-  { thickness: '1"', sellWeight: 42.67, buyWeightTW: 41.25, gainPctTW: 3.43, buyWeightJP: 41.98, gainPctJP: 1.61 },
-  { thickness: '1 1/8"', sellWeight: 47.83, buyWeightTW: 46.41, gainPctTW: 3.06, buyWeightJP: 47.23, gainPctJP: 1.25 },
-  { thickness: '1 1/4"', sellWeight: 53, buyWeightTW: 51.57, gainPctTW: 2.78, buyWeightJP: 52.48, gainPctJP: 0.98 },
-  { thickness: '1 3/8"', sellWeight: 58.17, buyWeightTW: 56.72, gainPctTW: 2.55, buyWeightJP: 57.73, gainPctJP: 0.76 },
-  { thickness: '1 1/2"', sellWeight: 63.34, buyWeightTW: 61.88, gainPctTW: 2.36, buyWeightJP: 62.97, gainPctJP: 0.58 },
-  { thickness: '1 3/4"', sellWeight: 73.67, buyWeightTW: 72.2, gainPctTW: 2.04, buyWeightJP: 73.47, gainPctJP: 0.27 },
-  { thickness: '2"', sellWeight: 84.01, buyWeightTW: 82.51, gainPctTW: 1.82, buyWeightJP: 83.97, gainPctJP: 0.05 },
-  { thickness: '2 1/4"', sellWeight: 94.7, buyWeightTW: 92.82, gainPctTW: 2.02, buyWeightJP: 94.46, gainPctJP: 0.25 },
-  { thickness: '2 1/2"', sellWeight: 105.1, buyWeightTW: 103.14, gainPctTW: 1.9, buyWeightJP: 104.96, gainPctJP: 0.14 },
-  { thickness: '2 3/4"', sellWeight: 115.4, buyWeightTW: 113.45, gainPctTW: 1.72, buyWeightJP: 115.45, gainPctJP: -0.05 },
-  { thickness: '3"', sellWeight: 126.3, buyWeightTW: 123.76, gainPctTW: 2.05, buyWeightJP: 125.95, gainPctJP: 0.28 },
-  { thickness: '3 1/4"', sellWeight: 136.6, buyWeightTW: 134.08, gainPctTW: 1.88, buyWeightJP: 136.44, gainPctJP: 0.11 },
-  { thickness: '3 1/2"', sellWeight: 147, buyWeightTW: 144.39, gainPctTW: 1.81, buyWeightJP: 146.94, gainPctJP: 0.04 },
-  { thickness: '3 3/4"', sellWeight: 157, buyWeightTW: 154.7, gainPctTW: 1.48, buyWeightJP: 157.44, gainPctJP: -0.28 },
-  { thickness: '4"', sellWeight: 167, buyWeightTW: 165.02, gainPctTW: 1.2, buyWeightJP: 167.93, gainPctJP: -0.56 },
+  { thickness: '3/16"', sellWeight: 8.579, buyWeightTW: 7.74, buyWeightJP: 7.87, gainPct: 10.91 },
+  { thickness: '1/4"', sellWeight: 11.16, buyWeightTW: 10.31, buyWeightJP: 10.5, gainPct: 8.21 },
+  { thickness: '5/16"', sellWeight: 13.75, buyWeightTW: 12.89, buyWeightJP: 13.12, gainPct: 6.66 },
+  { thickness: '3/8"', sellWeight: 16.5, buyWeightTW: 15.47, buyWeightJP: 15.74, gainPct: 6.66 },
+  { thickness: '1/2"', sellWeight: 21.66, buyWeightTW: 20.63, buyWeightJP: 20.99, gainPct: 5.01 },
+  { thickness: '5/8"', sellWeight: 26.83, buyWeightTW: 25.78, buyWeightJP: 26.24, gainPct: 4.06 },
+  { thickness: '3/4"', sellWeight: 32.12, buyWeightTW: 30.94, buyWeightJP: 31.49, gainPct: 3.81 },
+  { thickness: '7/8"', sellWeight: 37.29, buyWeightTW: 36.1, buyWeightJP: 36.73, gainPct: 3.3 },
+  { thickness: '1"', sellWeight: 42.67, buyWeightTW: 41.25, buyWeightJP: 41.98, gainPct: 3.43 },
+  { thickness: '1 1/8"', sellWeight: 47.83, buyWeightTW: 46.41, buyWeightJP: 47.23, gainPct: 3.06 },
+  { thickness: '1 1/4"', sellWeight: 53, buyWeightTW: 51.57, buyWeightJP: 52.48, gainPct: 2.78 },
+  { thickness: '1 3/8"', sellWeight: 58.17, buyWeightTW: 56.72, buyWeightJP: 57.73, gainPct: 2.55 },
+  { thickness: '1 1/2"', sellWeight: 63.34, buyWeightTW: 61.88, buyWeightJP: 62.97, gainPct: 2.36 },
+  { thickness: '1 3/4"', sellWeight: 73.67, buyWeightTW: 72.2, buyWeightJP: 73.47, gainPct: 2.04 },
+  { thickness: '2"', sellWeight: 84.01, buyWeightTW: 82.51, buyWeightJP: 83.97, gainPct: 1.82 },
+  { thickness: '2 1/4"', sellWeight: 94.7, buyWeightTW: 92.82, buyWeightJP: 94.46, gainPct: 2.02 },
+  { thickness: '2 1/2"', sellWeight: 105.1, buyWeightTW: 103.14, buyWeightJP: 104.96, gainPct: 1.9 },
+  { thickness: '2 3/4"', sellWeight: 115.4, buyWeightTW: 113.45, buyWeightJP: 115.45, gainPct: 1.72 },
+  { thickness: '3"', sellWeight: 126.3, buyWeightTW: 123.76, buyWeightJP: 125.95, gainPct: 2.05 },
+  { thickness: '3 1/4"', sellWeight: 136.6, buyWeightTW: 134.08, buyWeightJP: 136.44, gainPct: 1.88 },
+  { thickness: '3 1/2"', sellWeight: 147, buyWeightTW: 144.39, buyWeightJP: 146.94, gainPct: 1.81 },
+  { thickness: '3 3/4"', sellWeight: 157, buyWeightTW: 154.7, buyWeightJP: 157.44, gainPct: 1.48 },
+  { thickness: '4"', sellWeight: 167, buyWeightTW: 165.018, buyWeightJP: 167.931, gainPct: 1.2 },
 ];
 
 export const THICKNESS_OPTIONS = WEIGHT_GAIN_TABLE.map(r => r.thickness);
@@ -68,16 +70,9 @@ export function sizeOptionsFor(form: 'plate' | 'sheet'): string[] {
   return form === 'sheet' ? GAUGE_OPTIONS : THICKNESS_OPTIONS;
 }
 
-/** Weight gain % for a thickness, using the mill origin's column. */
-export function gainForThickness(thickness: string, basis: GainBasis): number | null {
-  const row = WEIGHT_GAIN_TABLE.find(r => r.thickness === thickness);
-  if (!row) return null;
-  return basis === 'JPKR' ? row.gainPctJP : row.gainPctTW;
-}
-
-/** Which gain column applies to a deal's origin port (Taiwan unless known otherwise). */
-export function gainBasisForPort(port: string, defaults: GlobalDefaults): GainBasis {
-  return defaults.originPorts.find(p => p.name === port)?.gainBasis ?? 'TW';
+/** Weight gain % for a plate thickness. Null for anything not in the table. */
+export function gainForThickness(thickness: string): number | null {
+  return WEIGHT_GAIN_TABLE.find(r => r.thickness === thickness)?.gainPct ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -117,13 +112,7 @@ export const GLOBAL_DEFAULTS: GlobalDefaults = {
   destinationPorts: ['Los Angeles', 'Houston', 'Baltimore', 'Seattle', 'Oakland', 'Chicago', 'Miami', 'New York', 'Camden'],
   suppliers: ['PVST', 'Stanch', 'Yeou Yih', 'Yuen Chang', 'Wuu Jing'],
   customers: ['Alro', 'Basic Metals', 'Oneal', 'Samuel'],
-  originPorts: [
-    { name: 'Kaohsiung', gainBasis: 'TW' },
-    { name: 'Taipei', gainBasis: 'TW' },
-    { name: 'Tokyo', gainBasis: 'JPKR' },
-    { name: 'Busan', gainBasis: 'JPKR' },
-    { name: 'Mumbai', gainBasis: 'TW' },
-  ],
+  originPorts: ['Kaohsiung', 'Taipei', 'Tokyo', 'Busan', 'Mumbai'],
   grades: ['304/L', '316/L', '304/L & 316/L'],
   commissionAgents: [
     { name: 'Chiu', pct: 1 },
@@ -173,7 +162,13 @@ export function normalizeDefaults(stored: unknown): GlobalDefaults {
     destinationPorts: arr(d.destinationPorts, base.destinationPorts),
     suppliers: arr(d.suppliers, base.suppliers),
     customers: arr(d.customers, base.customers),
-    originPorts: arr(d.originPorts, base.originPorts),
+    // Origin ports were once objects carrying a weight-gain column; plate now
+    // uses one column for every origin, so flatten anything stored that way.
+    originPorts: Array.isArray(d.originPorts)
+      ? d.originPorts
+          .map(p => (typeof p === 'string' ? p : isObj(p) && typeof p.name === 'string' ? p.name : null))
+          .filter((p): p is string => p !== null)
+      : base.originPorts,
     grades: arr(d.grades, base.grades),
     commissionAgents: arr(d.commissionAgents, base.commissionAgents),
   };

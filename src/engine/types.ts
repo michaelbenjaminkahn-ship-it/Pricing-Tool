@@ -145,23 +145,18 @@ export interface DealResult {
   hasQuantities: boolean;
 }
 
-/** Weight gain lookup row — % gain differs by mill origin (TW vs JP/KR). */
+/**
+ * Weight gain lookup row for plate.
+ *
+ * `gainPct` is the "% Gain TW" column from the pricing sheet, used for every
+ * origin. Buy weights are carried for reference only — nothing reads them.
+ */
 export interface WeightGainRow {
   thickness: string;
   sellWeight: number;
   buyWeightTW: number;
-  gainPctTW: number;
   buyWeightJP: number;
-  gainPctJP: number;
-}
-
-/** Which weight-gain column a mill's output is priced against. */
-export type GainBasis = 'TW' | 'JPKR';
-
-export interface OriginPort {
-  name: string;
-  /** Mills in Japan/Korea roll closer to theoretical weight than Taiwan. */
-  gainBasis: GainBasis;
+  gainPct: number;
 }
 
 /** Global defaults applied to new deals (deals snapshot their own copies). */
@@ -176,7 +171,7 @@ export interface GlobalDefaults {
   // Pick-lists — keep free text out of the day-to-day screens.
   suppliers: string[];
   customers: string[];
-  originPorts: OriginPort[];
+  originPorts: string[];
   grades: string[];
   commissionAgents: { name: string; pct: number }[];
 }

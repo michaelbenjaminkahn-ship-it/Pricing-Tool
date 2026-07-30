@@ -312,61 +312,12 @@ export function SettingsModal({
               />
             </div>
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
-                Origin ports — weight gain column
-              </h3>
-              <p className="text-xs text-slate-500 mb-2">
-                Japanese and Korean mills roll closer to theoretical weight, so they use a different gain column.
-                Picking an origin on a deal applies the right one automatically.
-              </p>
-              <div className="space-y-1.5 max-w-sm">
-                {defaults.originPorts.map(port => (
-                  <div key={port.name} className="flex items-center gap-2">
-                    <span className="text-sm text-slate-700 w-32">{port.name}</span>
-                    <SelectInput
-                      value={port.gainBasis}
-                      onChange={v =>
-                        onChange({
-                          ...defaults,
-                          originPorts: defaults.originPorts.map(p =>
-                            p.name === port.name ? { ...p, gainBasis: v as typeof p.gainBasis } : p,
-                          ),
-                        })
-                      }
-                      options={[
-                        { value: 'TW', label: 'Taiwan column' },
-                        { value: 'JPKR', label: 'Japan / Korea column' },
-                      ]}
-                      className="flex-1"
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onChange({
-                          ...defaults,
-                          originPorts: defaults.originPorts.filter(p => p.name !== port.name),
-                        })
-                      }
-                      className="text-slate-300 hover:text-rose-500 px-1"
-                      title={`Remove ${port.name}`}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const name = prompt('New origin port')?.trim();
-                    if (name && !defaults.originPorts.some(p => p.name === name)) {
-                      onChange({ ...defaults, originPorts: [...defaults.originPorts, { name, gainBasis: 'TW' }] });
-                    }
-                  }}
-                  className="text-xs text-blue-600 hover:underline"
-                >
-                  ＋ Add origin port
-                </button>
-              </div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Origin ports</h3>
+              <ChipList
+                items={defaults.originPorts}
+                onChange={originPorts => onChange({ ...defaults, originPorts })}
+                addLabel="New origin port"
+              />
             </div>
             <div>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Commission agents</h3>
