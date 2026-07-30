@@ -60,14 +60,22 @@ export function DealWorkspace({
     }
   };
 
-  /** Auto-filled gains follow the size; typed ones are left alone. */
+  /**
+   * Switching form switches the size vocabulary, so any size that belongs to
+   * the other one is cleared — a gauge must never sit under Plate, or an inch
+   * thickness under Sheet. Auto-filled gains follow; typed ones are left alone.
+   */
   const setProductForm = (form: Deal['productForm']) => {
+    const sizes = sizeOptionsFor(form);
     patch({
       productForm: form,
       products: deal.products.map(p => {
-        if (!p.weightGainAuto) return p;
-        const gain = form === 'sheet' ? null : gainForThickness(p.description);
-        return gain != null ? { ...p, weightGainPct: gain } : { ...p, weightGainPct: 0, weightGainAuto: false };
+        const description = sizes.includes(p.description) ? p.description : '';
+        if (!p.weightGainAuto) return { ...p, description };
+        const gain = form === 'sheet' ? null : gainForThickness(description);
+        return gain != null
+          ? { ...p, description, weightGainPct: gain }
+          : { ...p, description, weightGainPct: 0, weightGainAuto: false };
       }),
     });
   };

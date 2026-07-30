@@ -107,13 +107,35 @@ describe('normalizeDeal', () => {
 });
 
 describe('size lists', () => {
-  it('plate is sized in inches, sheet in gauges 10–26', () => {
+  it('plate is sized in inches, sheet in even gauges 10–26 plus 13', () => {
     expect(sizeOptionsFor('plate')).toBe(THICKNESS_OPTIONS);
     expect(sizeOptionsFor('plate')).toContain('1/2"');
     expect(sizeOptionsFor('sheet')).toBe(GAUGE_OPTIONS);
-    expect(GAUGE_OPTIONS[0]).toBe('10 GA');
-    expect(GAUGE_OPTIONS.at(-1)).toBe('26 GA');
-    expect(GAUGE_OPTIONS).toHaveLength(17); // 10 through 26 inclusive
+    expect(GAUGE_OPTIONS).toEqual([
+      '10 GA', '12 GA', '13 GA', '14 GA', '16 GA', '18 GA', '20 GA', '22 GA', '24 GA', '26 GA',
+    ]);
+  });
+
+  it('keeps the two size vocabularies separate', () => {
+    // No inch value may appear under sheet, and no gauge under plate.
+    for (const size of sizeOptionsFor('sheet')) expect(sizeOptionsFor('plate')).not.toContain(size);
+    for (const size of sizeOptionsFor('plate')) expect(sizeOptionsFor('sheet')).not.toContain(size);
+  });
+
+  it('drops a stored size that does not belong to the deal’s form', () => {
+    const sheet = normalizeDeal({
+      id: 'd', name: 'd', productForm: 'sheet',
+      products: [{ id: 'p', description: '1/2"', contractPrice: 2000 }],
+    })!;
+    expect(sheet.products[0].description).toBe('');
+    expect(sheet.products[0].contractPrice).toBe(2000); // price is untouched
+
+    const plate = normalizeDeal({
+      id: 'd', name: 'd', productForm: 'plate',
+      products: [{ id: 'p', description: '12 GA' }, { id: 'q', description: '1/2"' }],
+    })!;
+    expect(plate.products[0].description).toBe('');
+    expect(plate.products[1].description).toBe('1/2"'); // valid size survives
   });
 
   it('has no invented gain figures for gauges', () => {
