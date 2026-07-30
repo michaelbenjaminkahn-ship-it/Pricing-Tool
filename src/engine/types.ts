@@ -5,6 +5,8 @@
 // are actually structured (e.g. "YEOU YIH TO ALRO" with 1/2", 5/8", 1" columns).
 
 export type Incoterm = 'FOB' | 'CIF';
+/** Plate is sized in inches; sheet in gauges. Descriptive — no effect on the math. */
+export type ProductForm = 'plate' | 'sheet';
 export type ShippingType = 'container' | 'breakBulk';
 
 /** Base value used for LC finance charges.
@@ -23,6 +25,10 @@ export interface DealProduct {
   /** % — theoretical vs mill weight variance; reduces the material cost line only.
    *  Duties/fees stay on the contract price (customs basis). */
   weightGainPct: number;
+  /** True when weightGainPct came from the lookup table rather than being typed.
+   *  Auto values are re-derived or cleared when the size or origin changes; a
+   *  hand-entered figure is never overwritten. */
+  weightGainAuto?: boolean;
   /** $/lb — quoted sale price. If absent, the deal-level markup% is used. */
   salePricePerLb: number | null;
   /** lbs — used to roll up total margin dollars for the quote */
@@ -79,6 +85,8 @@ export interface Deal {
   customer: string;
   /** e.g. '304/L' — descriptive only, does not affect the math */
   grade?: string;
+  /** Drives which size list the quote picks from (inches vs gauges). */
+  productForm: ProductForm;
   originPort: string;
   destinationPort: string;
   incoterm: Incoterm;

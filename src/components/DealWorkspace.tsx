@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { Deal, DealProduct, GlobalDefaults, ProductResult } from '../engine/types';
 import { calculateDeal, fmtLb, fmtMoney, fmtPct, MT_TO_LB } from '../engine/calc';
-import { THICKNESS_OPTIONS, gainBasisForPort, gainForThickness, newProduct } from '../data/appDefaults';
+import { gainBasisForPort, gainForThickness, newProduct, sizeOptionsFor } from '../data/appDefaults';
 import { encodeDealToHash } from '../data/share';
 import { Button, Card, CardHeader, ComboSelect, Field, GpPill, Menu, NumInput, Segmented } from './ui';
 import { AssumptionsDrawer } from './AssumptionsDrawer';
@@ -44,22 +44,39 @@ export function DealWorkspace({
 
   const gainBasis = gainBasisForPort(deal.originPort, defaults);
 
-  /** Picking a thickness fills in its weight gain from the table automatically. */
-  const setThickness = (id: string, thickness: string) => {
-    const gain = gainForThickness(thickness, gainBasis);
-    patchProduct(id, { description: thickness, ...(gain != null ? { weightGainPct: gain } : {}) });
+  /**
+   * Picking a plate thickness fills in its weight gain from the table. Sheet
+   * gauges have no gain data, so a previously auto-filled figure is cleared
+   * rather than left to sit under a size it does not belong to. A gain the
+   * user typed is always kept.
+   */
+  const setSize = (id: string, size: string) => {
+    const product = deal.products.find(p => p.id === id);
+    const gain = deal.productForm === 'sheet' ? null : gainForThickness(size, gainBasis);
+    if (gain != null) {
+      patchProduct(id, { description: size, weightGainPct: gain, weightGainAuto: true });
+    } else if (product?.weightGainAuto) {
+      patchProduct(id, { description: size, weightGainPct: 0, weightGainAuto: false });
+    } else {
+      patchProduct(id, { description: size });
+    }
   };
 
-  const setOriginPort = (port: string) => {
-    // Re-derive every size's weight gain against the new mill origin's column.
-    const basis = gainBasisForPort(port, defaults);
-    patch({
-      originPort: port,
-      products: deal.products.map(p => {
-        const gain = gainForThickness(p.description, basis);
-        return gain != null ? { ...p, weightGainPct: gain } : p;
-      }),
+  /** Auto-filled gains follow the size/origin; typed ones are left alone. */
+  const rederiveGains = (products: DealProduct[], form: Deal['productForm'], basis: typeof gainBasis) =>
+    products.map(p => {
+      if (!p.weightGainAuto) return p;
+      const gain = form === 'sheet' ? null : gainForThickness(p.description, basis);
+      return gain != null ? { ...p, weightGainPct: gain } : { ...p, weightGainPct: 0, weightGainAuto: false };
     });
+
+  const setOriginPort = (port: string) => {
+    const basis = gainBasisForPort(port, defaults);
+    patch({ originPort: port, products: rederiveGains(deal.products, deal.productForm, basis) });
+  };
+
+  const setProductForm = (form: Deal['productForm']) => {
+    patch({ productForm: form, products: rederiveGains(deal.products, form, gainBasis) });
   };
 
   const setDestinationPort = (port: string) => {
@@ -237,9 +254,19 @@ export function DealWorkspace({
                 : 'Enter a sale price, or set a markup % above to fill them automatically.'
             }
             right={
-              <Button variant="ghost" className="no-print !text-blue-600" onClick={addSize}>
-                + Add size
-              </Button>
+              <div className="no-print flex items-center gap-2">
+                <Segmented
+                  value={deal.productForm}
+                  onChange={setProductForm}
+                  options={[
+                    { value: 'plate', label: 'Plate' },
+                    { value: 'sheet', label: 'Sheet' },
+                  ]}
+                />
+                <Button variant="ghost" className="!text-blue-600" onClick={addSize}>
+                  + Add size
+                </Button>
+              </div>
             }
           />
           <div className="overflow-x-auto px-4 pb-4">
@@ -252,9 +279,9 @@ export function DealWorkspace({
                       <div className="flex items-center gap-1">
                         <ComboSelect
                           value={p.description}
-                          onChange={v => setThickness(p.id, v)}
-                          options={THICKNESS_OPTIONS}
-                          placeholder="Size…"
+                          onChange={v => setSize(p.id, v)}
+                          options={sizeOptionsFor(deal.productForm)}
+                          placeholder={deal.productForm === 'sheet' ? 'Gauge…' : 'Thickness…'}
                           className="!font-semibold text-center"
                         />
                         {deal.products.length > 1 && (
@@ -320,7 +347,7 @@ export function DealWorkspace({
                       type="button"
                       onClick={() => setShowGainTable(true)}
                       className="no-print ml-1 text-slate-300 hover:text-blue-600"
-                      title="View the weight gain table"
+                      title={deal.productForm === 'sheet' ? 'View the gauge reference' : 'View the weight gain table'}
                     >
                       ▦
                     </button>
@@ -329,7 +356,7 @@ export function DealWorkspace({
                     <td key={p.id}>
                       <NumInput
                         value={p.weightGainPct}
-                        onChange={v => patchProduct(p.id, { weightGainPct: v })}
+                        onChange={v => patchProduct(p.id, { weightGainPct: v, weightGainAuto: false })}
                         suffix="%"
                       />
                     </td>
@@ -418,7 +445,9 @@ export function DealWorkspace({
           onClose={() => setShowAssumptions(false)}
         />
       )}
-      {showGainTable && <WeightGainPicker basis={gainBasis} onClose={() => setShowGainTable(false)} />}
+      {showGainTable && (
+        <WeightGainPicker basis={gainBasis} form={deal.productForm} onClose={() => setShowGainTable(false)} />
+      )}
 
       {toast && (
         <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg no-print">

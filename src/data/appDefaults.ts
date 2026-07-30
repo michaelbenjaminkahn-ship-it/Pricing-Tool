@@ -33,6 +33,41 @@ export const WEIGHT_GAIN_TABLE: WeightGainRow[] = [
 
 export const THICKNESS_OPTIONS = WEIGHT_GAIN_TABLE.map(r => r.thickness);
 
+// ---------------------------------------------------------------------------
+// Sheet gauges 10–26, with the standard nominal decimal thickness for
+// stainless sheet shown as a reference only.
+//
+// No weight-gain figures here on purpose: the plate table above came from the
+// pricing sheets, and there is no equivalent source for sheet. Picking a gauge
+// therefore leaves weight gain alone rather than filling in a made-up number.
+// ---------------------------------------------------------------------------
+export const SHEET_GAUGES: { gauge: string; nominalIn: number }[] = [
+  { gauge: '10 GA', nominalIn: 0.1406 },
+  { gauge: '11 GA', nominalIn: 0.125 },
+  { gauge: '12 GA', nominalIn: 0.1094 },
+  { gauge: '13 GA', nominalIn: 0.0938 },
+  { gauge: '14 GA', nominalIn: 0.0781 },
+  { gauge: '15 GA', nominalIn: 0.0703 },
+  { gauge: '16 GA', nominalIn: 0.0625 },
+  { gauge: '17 GA', nominalIn: 0.0563 },
+  { gauge: '18 GA', nominalIn: 0.05 },
+  { gauge: '19 GA', nominalIn: 0.0438 },
+  { gauge: '20 GA', nominalIn: 0.0375 },
+  { gauge: '21 GA', nominalIn: 0.0344 },
+  { gauge: '22 GA', nominalIn: 0.0313 },
+  { gauge: '23 GA', nominalIn: 0.0281 },
+  { gauge: '24 GA', nominalIn: 0.025 },
+  { gauge: '25 GA', nominalIn: 0.0219 },
+  { gauge: '26 GA', nominalIn: 0.0188 },
+];
+
+export const GAUGE_OPTIONS = SHEET_GAUGES.map(g => g.gauge);
+
+/** Size list for a deal's product form. */
+export function sizeOptionsFor(form: 'plate' | 'sheet'): string[] {
+  return form === 'sheet' ? GAUGE_OPTIONS : THICKNESS_OPTIONS;
+}
+
 /** Weight gain % for a thickness, using the mill origin's column. */
 export function gainForThickness(thickness: string, basis: GainBasis): number | null {
   const row = WEIGHT_GAIN_TABLE.find(r => r.thickness === thickness);
@@ -205,6 +240,7 @@ export function newDeal(defaults: GlobalDefaults, partial: Partial<Deal> = {}): 
     grade: '304/L',
     originPort: 'Kaohsiung',
     destinationPort: 'Los Angeles',
+    productForm: 'plate',
     incoterm: 'FOB',
     shippingType: 'container',
     freightPerContainer: 2800,
@@ -234,6 +270,7 @@ export function newDeal(defaults: GlobalDefaults, partial: Partial<Deal> = {}): 
 export function seedDeals(): Deal[] {
   const now = new Date().toISOString();
   const base = {
+    productForm: 'plate' as const,
     freightAdderPerMT: 0,
     markupPct: 0,
     notes: '',

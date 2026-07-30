@@ -29,6 +29,7 @@ function baseDeal(overrides: Partial<Deal>): Deal {
     customer: '',
     originPort: '',
     destinationPort: '',
+    productForm: 'plate',
     incoterm: 'FOB',
     shippingType: 'container',
     freightPerContainer: 0,
