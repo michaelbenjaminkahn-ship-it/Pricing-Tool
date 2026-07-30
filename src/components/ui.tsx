@@ -149,6 +149,98 @@ export function SelectInput({
   );
 }
 
+/**
+ * Dropdown over a managed pick-list, with an inline "＋ Add…" escape hatch so
+ * a new supplier/customer/port can be added without leaving the deal. The
+ * current value is always present in the list, even if it came from old data.
+ */
+export function ComboSelect({
+  value,
+  onChange,
+  options,
+  onAdd,
+  addLabel = 'Add new…',
+  placeholder = 'Select…',
+  className = '',
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  onAdd?: (v: string) => void;
+  addLabel?: string;
+  placeholder?: string;
+  className?: string;
+}) {
+  const all = value && !options.includes(value) ? [value, ...options] : options;
+  return (
+    <select
+      value={value}
+      onChange={e => {
+        if (e.target.value === '__add__') {
+          const name = prompt(addLabel)?.trim();
+          if (name) {
+            onAdd?.(name);
+            onChange(name);
+          }
+          return;
+        }
+        onChange(e.target.value);
+      }}
+      className={`${inputBase} ${className}`}
+    >
+      {!value && <option value="">{placeholder}</option>}
+      {all.map(o => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
+      {onAdd && <option value="__add__">＋ {addLabel}</option>}
+    </select>
+  );
+}
+
+/** Overflow menu — keeps secondary actions off the header. */
+export function Menu({ items }: { items: { label: string; onClick: () => void; danger?: boolean }[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <Button variant="ghost" onClick={() => setOpen(o => !o)} title="More actions">
+        ⋯
+      </Button>
+      {open && (
+        <div className="absolute right-0 mt-1 z-20 w-44 rounded-lg border border-slate-200 bg-white shadow-lg py-1">
+          {items.map(item => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                item.onClick();
+              }}
+              className={`w-full text-left px-3 py-1.5 text-sm hover:bg-slate-50 ${
+                item.danger ? 'text-rose-600' : 'text-slate-700'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Pill-style segmented control (used for incoterm, shipping type, etc.) */
 export function Segmented<T extends string>({
   value,
