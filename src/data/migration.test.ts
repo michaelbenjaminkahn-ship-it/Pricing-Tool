@@ -3,7 +3,17 @@
 // current defaults, so a missing key can never reach the UI and blank the page.
 
 import { describe, it, expect } from 'vitest';
-import { GLOBAL_DEFAULTS, normalizeDeal, normalizeDeals, normalizeDefaults, seedDeals } from './appDefaults';
+import {
+  GAUGE_OPTIONS,
+  GLOBAL_DEFAULTS,
+  THICKNESS_OPTIONS,
+  gainForThickness,
+  normalizeDeal,
+  normalizeDeals,
+  normalizeDefaults,
+  seedDeals,
+  sizeOptionsFor,
+} from './appDefaults';
 import { calculateDeal } from '../engine/calc';
 
 describe('normalizeDefaults', () => {
@@ -84,6 +94,30 @@ describe('normalizeDeal', () => {
     for (const seed of seeds) {
       expect(normalizeDeal(structuredClone(seed))).toEqual(seed);
     }
+  });
+});
+
+describe('size lists', () => {
+  it('plate is sized in inches, sheet in gauges 10–26', () => {
+    expect(sizeOptionsFor('plate')).toBe(THICKNESS_OPTIONS);
+    expect(sizeOptionsFor('plate')).toContain('1/2"');
+    expect(sizeOptionsFor('sheet')).toBe(GAUGE_OPTIONS);
+    expect(GAUGE_OPTIONS[0]).toBe('10 GA');
+    expect(GAUGE_OPTIONS.at(-1)).toBe('26 GA');
+    expect(GAUGE_OPTIONS).toHaveLength(17); // 10 through 26 inclusive
+  });
+
+  it('has no invented gain figures for gauges', () => {
+    // Sheet gain is unknown, so a gauge must never resolve to a number.
+    for (const gauge of GAUGE_OPTIONS) {
+      expect(gainForThickness(gauge, 'TW')).toBeNull();
+      expect(gainForThickness(gauge, 'JPKR')).toBeNull();
+    }
+  });
+
+  it('defaults a deal saved before the plate/sheet split to plate', () => {
+    const deal = normalizeDeal({ id: 'old', name: 'old', products: [{ id: 'p', description: '1/2"' }] })!;
+    expect(deal.productForm).toBe('plate');
   });
 });
 
