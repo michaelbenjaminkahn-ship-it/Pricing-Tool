@@ -43,23 +43,17 @@ export const THICKNESS_OPTIONS = WEIGHT_GAIN_TABLE.map(r => r.thickness);
 // pricing sheets, and there is no equivalent source for sheet. Picking a gauge
 // therefore leaves weight gain alone rather than filling in a made-up number.
 // ---------------------------------------------------------------------------
+// Even gauges only, plus 13 — the sizes actually traded.
 export const SHEET_GAUGES: { gauge: string; nominalIn: number }[] = [
   { gauge: '10 GA', nominalIn: 0.1406 },
-  { gauge: '11 GA', nominalIn: 0.125 },
   { gauge: '12 GA', nominalIn: 0.1094 },
   { gauge: '13 GA', nominalIn: 0.0938 },
   { gauge: '14 GA', nominalIn: 0.0781 },
-  { gauge: '15 GA', nominalIn: 0.0703 },
   { gauge: '16 GA', nominalIn: 0.0625 },
-  { gauge: '17 GA', nominalIn: 0.0563 },
   { gauge: '18 GA', nominalIn: 0.05 },
-  { gauge: '19 GA', nominalIn: 0.0438 },
   { gauge: '20 GA', nominalIn: 0.0375 },
-  { gauge: '21 GA', nominalIn: 0.0344 },
   { gauge: '22 GA', nominalIn: 0.0313 },
-  { gauge: '23 GA', nominalIn: 0.0281 },
   { gauge: '24 GA', nominalIn: 0.025 },
-  { gauge: '25 GA', nominalIn: 0.0219 },
   { gauge: '26 GA', nominalIn: 0.0188 },
 ];
 
@@ -192,10 +186,15 @@ export function normalizeDeal(stored: unknown): Deal | null {
       tariff: { ...base.finance.tariff, ...(isObj(finance.tariff) ? finance.tariff : {}) },
     },
     handling: { ...base.handling, ...(isObj(d.handling) ? d.handling : {}) },
-    products: (products.length ? products : [newProduct()]).map(p => ({
-      ...newProduct(),
-      ...(isObj(p) ? p : {}),
-    })),
+    products: (products.length ? products : [newProduct()]).map(p => {
+      const product = { ...newProduct(), ...(isObj(p) ? p : {}) };
+      // Sizes come from a fixed list per form. Anything else — a free-text
+      // label from an older version, or a gauge left over from a form switch —
+      // is dropped so the stored value always matches what the dropdown shows.
+      const form = (d.productForm as Deal['productForm']) ?? base.productForm;
+      if (!sizeOptionsFor(form).includes(product.description)) product.description = '';
+      return product;
+    }),
   };
 }
 
@@ -299,7 +298,7 @@ export function seedDeals(): Deal[] {
       brokerFee: 0, brokerBasis: 'perMT', commissionName: 'Chiu', commissionPct: 1,
     },
     markupPct: 4,
-    products: [newProduct({ description: 'Plate', contractPrice: 2260 })],
+    products: [newProduct({ contractPrice: 2260 })],
     notes: 'Imported from alro.xlsx — verified against the workbook to the cent.',
   };
 
@@ -329,7 +328,7 @@ export function seedDeals(): Deal[] {
       brokerFee: 0, brokerBasis: 'perMT', commissionName: 'Chiu', commissionPct: 1,
     },
     markupPct: 10,
-    products: [newProduct({ description: 'Plate', contractPrice: 2000 })],
+    products: [newProduct({ contractPrice: 2000 })],
     notes: 'Imported from sammyla50pct.xlsx — verified against the workbook to the cent.',
   };
 
