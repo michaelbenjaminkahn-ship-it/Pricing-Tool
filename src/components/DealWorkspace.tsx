@@ -243,14 +243,14 @@ export function DealWorkspace({
           </div>
         </Card>
 
-        {/* ---- Sizes & pricing ---- */}
+        {/* ---- Sizes & pricing: one row per quote line ---- */}
         <Card>
           <CardHeader
             title="Sizes & pricing"
             hint={
               deal.markupPct > 0
-                ? `Leave a sale price blank to price it at ${deal.markupPct}% markup.`
-                : 'Enter a sale price, or set a markup % above to fill them automatically.'
+                ? `One row per size. Leave a sale price blank to price it at ${deal.markupPct}% markup.`
+                : 'One row per size. Enter a sale price, or set a markup % above to fill them in.'
             }
             right={
               <div className="no-print flex items-center gap-2">
@@ -269,78 +269,12 @@ export function DealWorkspace({
             }
           />
           <div className="overflow-x-auto px-4 pb-4">
-            <table className="w-full text-sm min-w-[420px]">
+            <table className="w-full text-sm min-w-[760px]">
               <thead>
-                <tr>
-                  <th className="w-32 min-w-28"></th>
-                  {deal.products.map(p => (
-                    <th key={p.id} className="px-1.5 pb-1 min-w-32 align-bottom">
-                      <div className="flex items-center gap-1">
-                        <ComboSelect
-                          value={p.description}
-                          onChange={v => setSize(p.id, v)}
-                          options={sizeOptionsFor(deal.productForm)}
-                          placeholder={deal.productForm === 'sheet' ? 'Gauge…' : 'Thickness…'}
-                          className="!font-semibold text-center"
-                        />
-                        {deal.products.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeSize(p.id)}
-                            className="no-print text-slate-300 hover:text-rose-500 text-lg leading-none px-0.5"
-                            title="Remove size"
-                          >
-                            ×
-                          </button>
-                        )}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="[&>tr>td]:px-1.5 [&>tr>td]:py-1 [&>tr>th]:text-left [&>tr>th]:text-xs [&>tr>th]:font-medium [&>tr>th]:text-slate-500 [&>tr>th]:pr-2">
-                <tr>
-                  <th>{isCIF ? 'CIF price $/MT' : 'FOB price $/MT'}</th>
-                  {deal.products.map(p => (
-                    <td key={p.id}>
-                      <NumInput
-                        value={p.contractPrice}
-                        onChange={v => patchProduct(p.id, { contractPrice: v })}
-                        prefix="$"
-                      />
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <th>Sale $/lb</th>
-                  {deal.products.map(p => (
-                    <td key={p.id}>
-                      <NumInput
-                        value={p.salePricePerLb}
-                        onChange={v => patchProduct(p.id, { salePricePerLb: (v as number | null) ?? null })}
-                        nullable
-                        prefix="$"
-                        step={0.005}
-                        placeholder={deal.markupPct > 0 ? 'auto' : ''}
-                      />
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <th>Quantity lbs</th>
-                  {deal.products.map(p => (
-                    <td key={p.id}>
-                      <NumInput
-                        value={p.quantityLbs}
-                        onChange={v => patchProduct(p.id, { quantityLbs: (v as number | null) ?? null })}
-                        nullable
-                        placeholder="optional"
-                      />
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <th className="align-middle">
+                <tr className="text-[10px] uppercase tracking-wide text-slate-400 border-b border-slate-200 [&>th]:pb-1.5 [&>th]:px-1.5 [&>th]:font-medium">
+                  <th className="text-left w-40">{deal.productForm === 'sheet' ? 'Gauge' : 'Thickness'}</th>
+                  <th className="text-left w-28">{isCIF ? 'CIF $/MT' : 'FOB $/MT'}</th>
+                  <th className="text-left w-24">
                     Weight gain
                     <button
                       type="button"
@@ -351,60 +285,98 @@ export function DealWorkspace({
                       ▦
                     </button>
                   </th>
-                  {deal.products.map(p => (
-                    <td key={p.id}>
-                      <NumInput
-                        value={p.weightGainPct}
-                        onChange={v => patchProduct(p.id, { weightGainPct: v, weightGainAuto: false })}
-                        suffix="%"
-                      />
-                    </td>
-                  ))}
+                  <th className="text-left w-24">Sale $/lb</th>
+                  <th className="text-left w-24">Qty lbs</th>
+                  <th className="text-right w-24">Landed $/lb</th>
+                  <th className="text-right w-24">Margin $/lb</th>
+                  <th className="text-right w-16">GP</th>
+                  {anyQty && <th className="text-right w-24">Margin $</th>}
+                  <th className="w-6" />
                 </tr>
-
-                <tr className="border-t border-slate-200">
-                  <th className="pt-2">Landed $/lb</th>
-                  {result.products.map(p => (
-                    <td key={p.productId} className="num text-right pt-2 font-bold text-slate-900">
-                      {p.landedPerLb > 0 ? fmtLb(p.landedPerLb) : '—'}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <th>Margin $/lb</th>
-                  {result.products.map(p => (
-                    <td
-                      key={p.productId}
-                      className={`num text-right font-semibold ${
-                        p.marginPerLb == null
-                          ? 'text-slate-400'
-                          : p.marginPerLb >= 0
-                            ? 'text-emerald-600'
-                            : 'text-rose-600'
-                      }`}
-                    >
-                      {p.marginPerLb != null ? fmtLb(p.marginPerLb) : '—'}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <th>GP %</th>
-                  {result.products.map(p => (
-                    <td key={p.productId} className="text-right">
-                      <GpPill gp={p.gpPct} />
-                    </td>
-                  ))}
-                </tr>
-                {anyQty && (
-                  <tr>
-                    <th>Margin $</th>
-                    {result.products.map(p => (
-                      <td key={p.productId} className="num text-right text-slate-600">
-                        {p.marginDollars != null ? `$${fmtMoney(p.marginDollars, 0)}` : '—'}
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {deal.products.map((p, i) => {
+                  const r = result.products[i];
+                  return (
+                    <tr key={p.id} className="[&>td]:px-1.5 [&>td]:py-1.5">
+                      <td>
+                        <ComboSelect
+                          value={p.description}
+                          onChange={v => setSize(p.id, v)}
+                          options={sizeOptionsFor(deal.productForm)}
+                          placeholder={deal.productForm === 'sheet' ? 'Gauge…' : 'Thickness…'}
+                          className="!font-semibold"
+                        />
                       </td>
-                    ))}
-                  </tr>
-                )}
+                      <td>
+                        <NumInput
+                          value={p.contractPrice}
+                          onChange={v => patchProduct(p.id, { contractPrice: v })}
+                          prefix="$"
+                        />
+                      </td>
+                      <td>
+                        <NumInput
+                          value={p.weightGainPct}
+                          onChange={v => patchProduct(p.id, { weightGainPct: v, weightGainAuto: false })}
+                          suffix="%"
+                        />
+                      </td>
+                      <td>
+                        <NumInput
+                          value={p.salePricePerLb}
+                          onChange={v => patchProduct(p.id, { salePricePerLb: (v as number | null) ?? null })}
+                          nullable
+                          prefix="$"
+                          step={0.005}
+                          placeholder={deal.markupPct > 0 ? 'auto' : ''}
+                        />
+                      </td>
+                      <td>
+                        <NumInput
+                          value={p.quantityLbs}
+                          onChange={v => patchProduct(p.id, { quantityLbs: (v as number | null) ?? null })}
+                          nullable
+                          placeholder="optional"
+                        />
+                      </td>
+                      <td className="num text-right font-bold text-slate-900">
+                        {r && r.landedPerLb > 0 ? fmtLb(r.landedPerLb) : '—'}
+                      </td>
+                      <td
+                        className={`num text-right font-semibold ${
+                          !r || r.marginPerLb == null
+                            ? 'text-slate-400'
+                            : r.marginPerLb >= 0
+                              ? 'text-emerald-600'
+                              : 'text-rose-600'
+                        }`}
+                      >
+                        {r && r.marginPerLb != null ? fmtLb(r.marginPerLb) : '—'}
+                      </td>
+                      <td className="text-right">
+                        <GpPill gp={r?.gpPct ?? null} />
+                      </td>
+                      {anyQty && (
+                        <td className="num text-right text-slate-600">
+                          {r && r.marginDollars != null ? `$${fmtMoney(r.marginDollars, 0)}` : '—'}
+                        </td>
+                      )}
+                      <td className="text-right">
+                        {deal.products.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeSize(p.id)}
+                            className="no-print text-slate-300 hover:text-rose-500 text-lg leading-none"
+                            title="Remove this size"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
