@@ -169,6 +169,41 @@ describe('normalizeDeals', () => {
     expect(normalizeDeals('garbage').length).toBeGreaterThan(0);
   });
 
+  it('splits a saved multi-size quote into one deal per size', () => {
+    // A deal prices one item, so a stored quote with several sizes must become
+    // several deals rather than have its extra sizes silently hidden.
+    const deals = normalizeDeals([
+      {
+        id: 'camden',
+        name: 'Yeou Yih → Alro',
+        productForm: 'plate',
+        products: [
+          { id: 'a', description: '1/2"', contractPrice: 2260 },
+          { id: 'b', description: '5/8"', contractPrice: 2410 },
+          { id: 'c', description: '1"', contractPrice: 2430 },
+        ],
+      },
+    ]);
+    expect(deals).toHaveLength(3);
+    expect(deals.every(d => d.products.length === 1)).toBe(true);
+    expect(deals.map(d => d.name)).toEqual([
+      'Yeou Yih → Alro — 1/2"',
+      'Yeou Yih → Alro — 5/8"',
+      'Yeou Yih → Alro — 1"',
+    ]);
+    expect(deals.map(d => d.products[0].contractPrice)).toEqual([2260, 2410, 2430]);
+    expect(new Set(deals.map(d => d.id)).size).toBe(3); // ids stay unique
+  });
+
+  it('is idempotent — splitting once does not keep re-splitting', () => {
+    const once = normalizeDeals([
+      { id: 'd', name: 'Q', products: [{ id: 'a', description: '1/2"' }, { id: 'b', description: '1"' }] },
+    ]);
+    const twice = normalizeDeals(once);
+    expect(twice.map(d => d.name)).toEqual(once.map(d => d.name));
+    expect(twice).toHaveLength(2);
+  });
+
   it('drops unusable entries instead of crashing', () => {
     const deals = normalizeDeals([null, { id: 'ok', name: 'ok', products: [] }, 'junk']);
     expect(deals.length).toBe(1);

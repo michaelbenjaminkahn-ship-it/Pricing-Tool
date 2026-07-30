@@ -200,7 +200,19 @@ export function normalizeDeal(stored: unknown): Deal | null {
 
 export function normalizeDeals(stored: unknown): Deal[] {
   if (!Array.isArray(stored)) return seedDeals();
-  return stored.map(normalizeDeal).filter((d): d is Deal => d !== null);
+  return stored.flatMap(entry => {
+    const deal = normalizeDeal(entry);
+    if (!deal) return [];
+    if (deal.products.length <= 1) return [deal];
+    // A deal prices one item. A quote saved with several sizes becomes one deal
+    // per size so nothing is hidden behind a UI that only shows the first.
+    return deal.products.map((product, i) => ({
+      ...deal,
+      id: i === 0 ? deal.id : makeId('deal'),
+      name: product.description ? `${deal.name} — ${product.description}` : `${deal.name} (${i + 1})`,
+      products: [product],
+    }));
+  });
 }
 
 // ---------------------------------------------------------------------------

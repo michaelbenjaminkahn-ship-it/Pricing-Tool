@@ -1,16 +1,18 @@
 import { useMemo, useState } from 'react';
 import type { Deal, DealProduct, GlobalDefaults, ProductResult } from '../engine/types';
 import { calculateDeal, fmtLb, fmtMoney, fmtPct, MT_TO_LB } from '../engine/calc';
-import { gainForThickness, newProduct, sizeOptionsFor } from '../data/appDefaults';
+import { gainForThickness, sizeOptionsFor } from '../data/appDefaults';
 import { encodeDealToHash } from '../data/share';
 import { Button, Card, CardHeader, ComboSelect, Field, GpPill, Menu, NumInput, Segmented } from './ui';
 import { AssumptionsDrawer } from './AssumptionsDrawer';
 import { WeightGainPicker } from './WeightGainPicker';
 
 /**
- * Day-to-day pricing screen. Only the fields that change per quote are on
- * screen — lane, freight, and the size grid. Duties, finance, and handling sit
- * behind the assumptions summary, which shows them densely and read-only.
+ * Day-to-day pricing screen — one item per deal.
+ *
+ * Only the fields that change per quote are on screen: lane, freight, and the
+ * item. Duties, finance, and handling sit behind the assumptions summary,
+ * which shows them densely and read-only.
  */
 export function DealWorkspace({
   deal,
@@ -30,17 +32,15 @@ export function DealWorkspace({
   onDefaultsChange: (d: GlobalDefaults) => void;
 }) {
   const result = useMemo(() => calculateDeal(deal), [deal]);
-  const [selectedId, setSelectedId] = useState<string>(deal.products[0]?.id ?? '');
   const [showAssumptions, setShowAssumptions] = useState(false);
   const [showGainTable, setShowGainTable] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  const selected: ProductResult =
-    result.products.find(p => p.productId === selectedId) ?? result.products[0];
+  const product = deal.products[0];
+  const priced: ProductResult | undefined = result.products[0];
 
   const patch = (p: Partial<Deal>) => onChange({ ...deal, ...p, updatedAt: new Date().toISOString() });
-  const patchProduct = (id: string, p: Partial<DealProduct>) =>
-    patch({ products: deal.products.map(x => (x.id === id ? { ...x, ...p } : x)) });
+  const patchProduct = (p: Partial<DealProduct>) => patch({ products: [{ ...product, ...p }] });
 
   /**
    * Picking a plate thickness fills in its weight gain from the table. Sheet
@@ -48,35 +48,34 @@ export function DealWorkspace({
    * rather than left to sit under a size it does not belong to. A gain the
    * user typed is always kept.
    */
-  const setSize = (id: string, size: string) => {
-    const product = deal.products.find(p => p.id === id);
+  const setSize = (size: string) => {
     const gain = deal.productForm === 'sheet' ? null : gainForThickness(size);
-    if (gain != null) {
-      patchProduct(id, { description: size, weightGainPct: gain, weightGainAuto: true });
-    } else if (product?.weightGainAuto) {
-      patchProduct(id, { description: size, weightGainPct: 0, weightGainAuto: false });
-    } else {
-      patchProduct(id, { description: size });
-    }
+    if (gain != null) patchProduct({ description: size, weightGainPct: gain, weightGainAuto: true });
+    else if (product.weightGainAuto) patchProduct({ description: size, weightGainPct: 0, weightGainAuto: false });
+    else patchProduct({ description: size });
   };
 
   /**
-   * Switching form switches the size vocabulary, so any size that belongs to
-   * the other one is cleared — a gauge must never sit under Plate, or an inch
-   * thickness under Sheet. Auto-filled gains follow; typed ones are left alone.
+   * Switching form switches the size vocabulary, so a size belonging to the
+   * other one is cleared — a gauge must never sit under Plate, or an inch
+   * thickness under Sheet. An auto-filled gain follows; a typed one is kept.
    */
   const setProductForm = (form: Deal['productForm']) => {
-    const sizes = sizeOptionsFor(form);
+    const description = sizeOptionsFor(form).includes(product.description) ? product.description : '';
+    const gain = form === 'sheet' ? null : gainForThickness(description);
     patch({
       productForm: form,
-      products: deal.products.map(p => {
-        const description = sizes.includes(p.description) ? p.description : '';
-        if (!p.weightGainAuto) return { ...p, description };
-        const gain = form === 'sheet' ? null : gainForThickness(description);
-        return gain != null
-          ? { ...p, description, weightGainPct: gain }
-          : { ...p, description, weightGainPct: 0, weightGainAuto: false };
-      }),
+      products: [
+        {
+          ...product,
+          description,
+          ...(product.weightGainAuto
+            ? gain != null
+              ? { weightGainPct: gain }
+              : { weightGainPct: 0, weightGainAuto: false }
+            : {}),
+        },
+      ],
     });
   };
 
@@ -89,17 +88,6 @@ export function DealWorkspace({
         ...(drayage != null && deal.shippingType === 'container' ? { drayagePerContainer: drayage } : {}),
       },
     });
-  };
-
-  const addSize = () => {
-    const prod = newProduct();
-    patch({ products: [...deal.products, prod] });
-    setSelectedId(prod.id);
-  };
-  const removeSize = (id: string) => {
-    if (deal.products.length <= 1) return;
-    patch({ products: deal.products.filter(p => p.id !== id) });
-    if (selectedId === id) setSelectedId(deal.products.find(p => p.id !== id)?.id ?? '');
   };
 
   const share = async () => {
@@ -115,10 +103,9 @@ export function DealWorkspace({
 
   const isCIF = deal.incoterm === 'CIF';
   const isContainer = deal.shippingType === 'container';
-  const anyQty = deal.products.some(p => p.quantityLbs != null && p.quantityLbs > 0);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
+    <div className="max-w-4xl mx-auto px-4 py-6">
       {/* Header */}
       <header className="no-print flex items-center gap-2 mb-5">
         <Button variant="ghost" onClick={onBack}>
@@ -243,153 +230,100 @@ export function DealWorkspace({
           </div>
         </Card>
 
-        {/* ---- Sizes & pricing: one row per quote line ---- */}
+        {/* ---- The item being priced ---- */}
         <Card>
           <CardHeader
-            title="Sizes & pricing"
+            title="Item"
             hint={
               deal.markupPct > 0
-                ? `One row per size. Leave a sale price blank to price it at ${deal.markupPct}% markup.`
-                : 'One row per size. Enter a sale price, or set a markup % above to fill them in.'
+                ? `Leave the sale price blank to price at ${deal.markupPct}% markup.`
+                : 'Enter a sale price, or set a markup % above to fill it in.'
             }
             right={
-              <div className="no-print flex items-center gap-2">
-                <Segmented
-                  value={deal.productForm}
-                  onChange={setProductForm}
-                  options={[
-                    { value: 'plate', label: 'Plate' },
-                    { value: 'sheet', label: 'Sheet' },
-                  ]}
-                />
-                <Button variant="ghost" className="!text-blue-600" onClick={addSize}>
-                  + Add size
-                </Button>
-              </div>
+              <Segmented
+                value={deal.productForm}
+                onChange={setProductForm}
+                options={[
+                  { value: 'plate', label: 'Plate' },
+                  { value: 'sheet', label: 'Sheet' },
+                ]}
+              />
             }
           />
-          <div className="overflow-x-auto px-4 pb-4">
-            <table className="w-full text-sm min-w-[760px]">
-              <thead>
-                <tr className="text-[10px] uppercase tracking-wide text-slate-400 border-b border-slate-200 [&>th]:pb-1.5 [&>th]:px-1.5 [&>th]:font-medium">
-                  <th className="text-left w-40">{deal.productForm === 'sheet' ? 'Gauge' : 'Thickness'}</th>
-                  <th className="text-left w-28">{isCIF ? 'CIF $/MT' : 'FOB $/MT'}</th>
-                  <th className="text-left w-24">
-                    Weight gain
-                    <button
-                      type="button"
-                      onClick={() => setShowGainTable(true)}
-                      className="no-print ml-1 text-slate-300 hover:text-blue-600"
-                      title={deal.productForm === 'sheet' ? 'View the gauge reference' : 'View the weight gain table'}
-                    >
-                      ▦
-                    </button>
-                  </th>
-                  <th className="text-left w-24">Sale $/lb</th>
-                  <th className="text-left w-24">Qty lbs</th>
-                  <th className="text-right w-24">Landed $/lb</th>
-                  <th className="text-right w-24">Margin $/lb</th>
-                  <th className="text-right w-16">GP</th>
-                  {anyQty && <th className="text-right w-24">Margin $</th>}
-                  <th className="w-6" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {deal.products.map((p, i) => {
-                  const r = result.products[i];
-                  return (
-                    <tr key={p.id} className="[&>td]:px-1.5 [&>td]:py-1.5">
-                      <td>
-                        <ComboSelect
-                          value={p.description}
-                          onChange={v => setSize(p.id, v)}
-                          options={sizeOptionsFor(deal.productForm)}
-                          placeholder={deal.productForm === 'sheet' ? 'Gauge…' : 'Thickness…'}
-                          className="!font-semibold"
-                        />
-                      </td>
-                      <td>
-                        <NumInput
-                          value={p.contractPrice}
-                          onChange={v => patchProduct(p.id, { contractPrice: v })}
-                          prefix="$"
-                        />
-                      </td>
-                      <td>
-                        <NumInput
-                          value={p.weightGainPct}
-                          onChange={v => patchProduct(p.id, { weightGainPct: v, weightGainAuto: false })}
-                          suffix="%"
-                        />
-                      </td>
-                      <td>
-                        <NumInput
-                          value={p.salePricePerLb}
-                          onChange={v => patchProduct(p.id, { salePricePerLb: (v as number | null) ?? null })}
-                          nullable
-                          prefix="$"
-                          step={0.005}
-                          placeholder={deal.markupPct > 0 ? 'auto' : ''}
-                        />
-                      </td>
-                      <td>
-                        <NumInput
-                          value={p.quantityLbs}
-                          onChange={v => patchProduct(p.id, { quantityLbs: (v as number | null) ?? null })}
-                          nullable
-                          placeholder="optional"
-                        />
-                      </td>
-                      <td className="num text-right font-bold text-slate-900">
-                        {r && r.landedPerLb > 0 ? fmtLb(r.landedPerLb) : '—'}
-                      </td>
-                      <td
-                        className={`num text-right font-semibold ${
-                          !r || r.marginPerLb == null
-                            ? 'text-slate-400'
-                            : r.marginPerLb >= 0
-                              ? 'text-emerald-600'
-                              : 'text-rose-600'
-                        }`}
-                      >
-                        {r && r.marginPerLb != null ? fmtLb(r.marginPerLb) : '—'}
-                      </td>
-                      <td className="text-right">
-                        <GpPill gp={r?.gpPct ?? null} />
-                      </td>
-                      {anyQty && (
-                        <td className="num text-right text-slate-600">
-                          {r && r.marginDollars != null ? `$${fmtMoney(r.marginDollars, 0)}` : '—'}
-                        </td>
-                      )}
-                      <td className="text-right">
-                        {deal.products.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeSize(p.id)}
-                            className="no-print text-slate-300 hover:text-rose-500 text-lg leading-none"
-                            title="Remove this size"
-                          >
-                            ×
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="px-4 pb-4 grid grid-cols-2 md:grid-cols-5 gap-3">
+            <Field label={deal.productForm === 'sheet' ? 'Gauge' : 'Thickness'}>
+              <ComboSelect
+                value={product.description}
+                onChange={setSize}
+                options={sizeOptionsFor(deal.productForm)}
+                placeholder={deal.productForm === 'sheet' ? 'Gauge…' : 'Thickness…'}
+              />
+            </Field>
+            <Field label={isCIF ? 'CIF price $/MT' : 'FOB price $/MT'}>
+              <NumInput
+                value={product.contractPrice}
+                onChange={v => patchProduct({ contractPrice: v })}
+                prefix="$"
+              />
+            </Field>
+            <Field label="Weight gain %">
+              <div className="flex items-center gap-1">
+                <NumInput
+                  value={product.weightGainPct}
+                  onChange={v => patchProduct({ weightGainPct: v, weightGainAuto: false })}
+                  suffix="%"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowGainTable(true)}
+                  className="no-print shrink-0 rounded border border-slate-300 px-1 py-1 text-xs text-slate-400 hover:text-blue-600"
+                  title={deal.productForm === 'sheet' ? 'View the gauge reference' : 'View the weight gain table'}
+                >
+                  ▦
+                </button>
+              </div>
+            </Field>
+            <Field label="Sale price $/lb">
+              <NumInput
+                value={product.salePricePerLb}
+                onChange={v => patchProduct({ salePricePerLb: (v as number | null) ?? null })}
+                nullable
+                prefix="$"
+                step={0.005}
+                placeholder={deal.markupPct > 0 ? 'auto' : ''}
+              />
+            </Field>
+            <Field label="Quantity lbs">
+              <NumInput
+                value={product.quantityLbs}
+                onChange={v => patchProduct({ quantityLbs: (v as number | null) ?? null })}
+                nullable
+                placeholder="optional"
+              />
+            </Field>
           </div>
-          {result.hasQuantities && (
-            <div className="flex justify-between items-center px-4 py-2.5 border-t border-slate-200 bg-slate-50 rounded-b-xl">
-              <span className="text-xs font-medium text-slate-600">Total margin (quote)</span>
-              <span
-                className={`num text-base font-bold ${
-                  result.totalMarginDollars >= 0 ? 'text-emerald-600' : 'text-rose-600'
-                }`}
-              >
-                ${fmtMoney(result.totalMarginDollars, 0)}
-              </span>
+
+          {/* Result */}
+          {priced && priced.landedPerMT > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-slate-200 border-t border-slate-200 bg-slate-50 rounded-b-xl">
+              <Stat label="Landed $/lb" value={fmtLb(priced.landedPerLb)} strong />
+              <Stat
+                label="Sale $/lb"
+                value={priced.salePerLb != null ? priced.salePerLb.toFixed(4) : '—'}
+                note={priced.saleSource === 'markup' ? `${deal.markupPct}% markup` : undefined}
+              />
+              <Stat
+                label="Margin $/lb"
+                value={priced.marginPerLb != null ? fmtLb(priced.marginPerLb) : '—'}
+                tone={priced.marginPerLb == null ? undefined : priced.marginPerLb >= 0 ? 'good' : 'bad'}
+                badge={<GpPill gp={priced.gpPct} />}
+              />
+              <Stat
+                label="Margin $"
+                value={priced.marginDollars != null ? `$${fmtMoney(priced.marginDollars, 0)}` : '—'}
+                note={priced.marginDollars == null ? 'add a quantity' : undefined}
+                tone={priced.marginDollars == null ? undefined : priced.marginDollars >= 0 ? 'good' : 'bad'}
+              />
             </div>
           )}
         </Card>
@@ -398,14 +332,7 @@ export function DealWorkspace({
         <AssumptionsSummary deal={deal} onEdit={() => setShowAssumptions(true)} />
 
         {/* ---- Breakdown ---- */}
-        {selected && selected.landedPerMT > 0 && (
-          <BreakdownCard
-            result={selected}
-            products={result.products}
-            selectedId={selected.productId}
-            onSelect={setSelectedId}
-          />
-        )}
+        {priced && priced.landedPerMT > 0 && <BreakdownCard result={priced} />}
       </div>
 
       {showAssumptions && (
@@ -423,6 +350,34 @@ export function DealWorkspace({
           {toast}
         </div>
       )}
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  note,
+  strong,
+  tone,
+  badge,
+}: {
+  label: string;
+  value: string;
+  note?: string;
+  strong?: boolean;
+  tone?: 'good' | 'bad';
+  badge?: React.ReactNode;
+}) {
+  const color = tone === 'good' ? 'text-emerald-600' : tone === 'bad' ? 'text-rose-600' : 'text-slate-900';
+  return (
+    <div className="px-4 py-2.5">
+      <p className="text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
+      <p className={`num text-lg ${strong ? 'font-bold' : 'font-semibold'} ${color} flex items-center gap-2`}>
+        {value}
+        {badge}
+      </p>
+      {note && <p className="text-[10px] text-slate-400">{note}</p>}
     </div>
   );
 }
@@ -474,17 +429,7 @@ function AssumptionsSummary({ deal, onEdit }: { deal: Deal; onEdit: () => void }
 // ---------------------------------------------------------------------------
 // Cost breakdown with per-line formulas — the audit trail.
 // ---------------------------------------------------------------------------
-function BreakdownCard({
-  result,
-  products,
-  selectedId,
-  onSelect,
-}: {
-  result: ProductResult;
-  products: ProductResult[];
-  selectedId: string;
-  onSelect: (id: string) => void;
-}) {
+function BreakdownCard({ result }: { result: ProductResult }) {
   const [whatIf, setWhatIf] = useState<number | null>(null);
   const whatIfMargin = whatIf != null && whatIf > 0 ? whatIf - result.landedPerLb : null;
 
@@ -493,26 +438,6 @@ function BreakdownCard({
       <CardHeader
         title="Cost breakdown"
         hint="Every line shows its formula — check any number the way you would in Excel."
-        right={
-          products.length > 1 ? (
-            <div className="no-print flex gap-1">
-              {products.map(p => (
-                <button
-                  key={p.productId}
-                  type="button"
-                  onClick={() => onSelect(p.productId)}
-                  className={`px-2 py-1 text-xs font-medium rounded-md ${
-                    p.productId === selectedId
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {p.description || '—'}
-                </button>
-              ))}
-            </div>
-          ) : undefined
-        }
       />
       <div className="px-4 pb-4 overflow-x-auto">
         <table className="w-full text-sm min-w-[480px]">
