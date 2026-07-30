@@ -1,50 +1,91 @@
-import { useState } from 'react';
-import { Calculator } from './components/Calculator';
-import { Settings } from './components/Settings';
-import { AppSettingsContext, useAppSettingsState } from './hooks/useAppSettings';
+import { useEffect, useState } from 'react';
+import type { Deal, GlobalDefaults } from './engine/types';
+import { GLOBAL_DEFAULTS, makeId, newDeal, seedDeals } from './data/appDefaults';
+import { decodeDealFromHash } from './data/share';
+import { useLocalStorage } from './hooks/useLocalStorage';
+import { DealsList } from './components/DealsList';
+import { DealWorkspace } from './components/DealWorkspace';
+import { SettingsModal } from './components/SettingsModal';
 
-function AppContent() {
+export default function App() {
+  const [deals, setDeals] = useLocalStorage<Deal[]>('spt2-deals', seedDeals);
+  const [defaults, setDefaults] = useLocalStorage<GlobalDefaults>('spt2-defaults', GLOBAL_DEFAULTS);
+  const [openDealId, setOpenDealId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
 
+  // Import a deal shared via URL hash (#d=...)
+  useEffect(() => {
+    const shared = decodeDealFromHash(location.hash);
+    if (shared) {
+      const imported: Deal = {
+        ...shared,
+        id: makeId('deal'),
+        name: shared.name,
+        updatedAt: new Date().toISOString(),
+      };
+      setDeals(prev => [...prev, imported]);
+      setOpenDealId(imported.id);
+      history.replaceState(null, '', location.pathname + location.search);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const openDeal = deals.find(d => d.id === openDealId) ?? null;
+
+  const updateDeal = (updated: Deal) =>
+    setDeals(prev => prev.map(d => (d.id === updated.id ? updated : d)));
+
+  const createDeal = () => {
+    const deal = newDeal(defaults);
+    setDeals(prev => [...prev, deal]);
+    setOpenDealId(deal.id);
+  };
+
+  const duplicateDeal = (id: string) => {
+    const source = deals.find(d => d.id === id);
+    if (!source) return;
+    const now = new Date().toISOString();
+    const copy: Deal = {
+      ...structuredClone(source),
+      id: makeId('deal'),
+      name: `${source.name} (copy)`,
+      createdAt: now,
+      updatedAt: now,
+    };
+    setDeals(prev => [...prev, copy]);
+    setOpenDealId(copy.id);
+  };
+
+  const deleteDeal = (id: string) => {
+    setDeals(prev => prev.filter(d => d.id !== id));
+    if (openDealId === id) setOpenDealId(null);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Settings button - fixed position */}
-      <button
-        onClick={() => setShowSettings(true)}
-        className="fixed top-4 right-4 z-40 p-2 bg-white rounded-full shadow-lg hover:bg-gray-50 transition-colors"
-        title="Settings"
-      >
-        <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-          />
-        </svg>
-      </button>
+    <div className="min-h-screen">
+      {openDeal ? (
+        <DealWorkspace
+          deal={openDeal}
+          onChange={updateDeal}
+          onBack={() => setOpenDealId(null)}
+          onDuplicate={() => duplicateDeal(openDeal.id)}
+          onDelete={() => deleteDeal(openDeal.id)}
+          defaults={defaults}
+        />
+      ) : (
+        <DealsList
+          deals={deals}
+          onOpen={setOpenDealId}
+          onNew={createDeal}
+          onDuplicate={duplicateDeal}
+          onDelete={deleteDeal}
+          onOpenSettings={() => setShowSettings(true)}
+        />
+      )}
 
-      <Calculator />
-
-      {showSettings && <Settings onClose={() => setShowSettings(false)} />}
+      {showSettings && (
+        <SettingsModal defaults={defaults} onChange={setDefaults} onClose={() => setShowSettings(false)} />
+      )}
     </div>
   );
 }
-
-function App() {
-  const settingsState = useAppSettingsState();
-
-  return (
-    <AppSettingsContext.Provider value={settingsState}>
-      <AppContent />
-    </AppSettingsContext.Provider>
-  );
-}
-
-export default App;
